@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光的干涉與繞射模擬器 (Wave Optics Simulator)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        physicsBg: '#0b0f19',
+                        physicsCard: '#131b2e',
+                        physicsBorder: '#1f2d4d',
+                        physicsAccent: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #0b0f19;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        /* Custom Glowing Slider Styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #1e293b;
+            border-radius: 6px;
+            height: 6px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="border-b border-physicsBorder bg-physicsCard/80 backdrop-blur px-6 py-4 flex flex-wrap justify-between items-center gap-4 sticky top-0 z-50">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-blue-600/20 text-blue-400 rounded-lg border border-blue-500/30">
+                <i class="fa-solid fa-wave-square text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg text-white tracking-wide">波動光學物理模擬器</h1>
+                <p class="text-xs text-slate-400">單狹縫繞射與雙狹縫干涉 (Diffraction & Interference)</p>
+            </div>
+        </div>
+
+        <!-- Mode Selector -->
+        <div class="flex bg-slate-900/80 p-1 rounded-xl border border-physicsBorder">
+            <button id="modeSingleBtn" onclick="setMode('single')" class="px-4 py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center space-x-2 bg-physicsAccent text-white shadow-lg shadow-blue-500/30">
+                <i class="fa-solid fa-grip-lines-vertical text-xs"></i>
+                <span>單狹縫繞射</span>
+            </button>
+            <button id="modeDoubleBtn" onclick="setMode('double')" class="px-4 py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-pause text-xs"></i>
+                <span>雙狹縫干涉</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1800px] mx-auto w-full flex-grow">
+
+        <!-- Left Controls Panel (4 Cols) -->
+        <div class="lg:col-span-4 flex flex-col space-y-5">
+            <!-- Parameter Adjustment Box -->
+            <div class="bg-physicsCard border border-physicsBorder rounded-2xl p-5 shadow-xl flex flex-col space-y-5">
+                <div class="flex justify-between items-center border-b border-physicsBorder/60 pb-3">
+                    <h2 class="font-bold text-sm uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-blue-400"></i> 實驗參數控制 (Controls)
+                    </h2>
+                    <button id="playPauseBtn" onclick="togglePlayPause()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition flex items-center gap-1.5">
+                        <i id="playIcon" class="fa-solid fa-pause"></i>
+                        <span id="playText">暫停動畫</span>
+                    </button>
+                </div>
+
+                <!-- Wavelength Slider -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <label class="text-slate-300 font-medium">光的波長 ($\lambda$)</label>
+                        <span class="font-mono text-blue-400 font-semibold" id="lambdaValue">550 nm</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <input type="range" id="lambdaInput" min="380" max="750" value="550" class="w-full" oninput="updateParams()">
+                        <div id="colorIndicator" class="w-6 h-6 rounded-full border border-white/20 shadow-inner flex-shrink-0" style="background-color: #00ff00;"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                        <span>紫 380nm</span>
+                        <span>綠 550nm</span>
+                        <span>紅 750nm</span>
+                    </div>
+                </div>
+
+                <!-- Slit Width (a) -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <label class="text-slate-300 font-medium">狹縫寬度 ($a$)</label>
+                        <span class="font-mono text-blue-400 font-semibold" id="aValue">20 $\mu\text{m}$</span>
+                    </div>
+                    <input type="range" id="aInput" min="5" max="60" value="20" class="w-full" oninput="updateParams()">
+                    <p class="text-[11px] text-slate-400">影響繞射包絡線（影響單狹縫中央亮紋的寬度）。</p>
+                </div>
+
+                <!-- Slit Distance (d) - Double Slit Mode Only -->
+                <div id="dControlContainer" class="space-y-2 transition-all duration-300 opacity-50 pointer-events-none">
+                    <div class="flex justify-between items-center text-xs">
+                        <label class="text-slate-300 font-medium">雙狹縫間距 ($d$)</label>
+                        <span class="font-mono text-blue-400 font-semibold" id="dValue">100 $\mu\text{m}$</span>
+                    </div>
+                    <input type="range" id="dInput" min="30" max="200" value="100" class="w-full" oninput="updateParams()">
+                    <p class="text-[11px] text-slate-400">影響干涉細紋的密度（$d$ 越大，條紋越密）。</p>
+                </div>
+
+                <!-- Distance to Screen (L) -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <label class="text-slate-300 font-medium">狹縫至屏幕距離 ($L$)</label>
+                        <span class="font-mono text-blue-400 font-semibold" id="LValue">1.0 m</span>
+                    </div>
+                    <input type="range" id="LInput" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full" oninput="updateParams()">
+                </div>
+            </div>
+
+            <!-- Physics Info & Formula Card -->
+            <div class="bg-physicsCard border border-physicsBorder rounded-2xl p-5 shadow-xl flex flex-col space-y-3">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-yellow-400"></i> 物理原理解析 (Physics Concepts)
+                </h3>
+                <div id="physicsTextContent" class="text-xs text-slate-300 leading-relaxed space-y-2">
+                    <!-- Dynamic physics description text -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Visualization Panel (8 Cols) -->
+        <div class="lg:col-span-8 flex flex-col space-y-6">
+            
+            <!-- Canvas 1: Animated Physical Simulation -->
+            <div class="bg-physicsCard border border-physicsBorder rounded-2xl p-4 shadow-xl flex flex-col relative overflow-hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-2">
+                        <i class="fa-solid fa-eye text-emerald-400"></i> 光波傳播與干涉實時模擬 (Wave Propagation Canvas)
+                    </span>
+                    <span class="text-[11px] bg-slate-800 text-slate-400 px-2 py-1 rounded border border-slate-700">右側：光屏強度變化</span>
+                </div>
+                
+                <div class="relative w-full aspect-[16/9] md:aspect-[21/9] bg-black rounded-xl overflow-hidden border border-slate-800">
+                    <canvas id="simCanvas" class="w-full h-full block"></canvas>
+                </div>
+            </div>
+
+            <!-- Canvas 2: Real-time Mathematical Intensity Graph -->
+            <div class="bg-physicsCard border border-physicsBorder rounded-2xl p-4 shadow-xl flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-2">
+                        <i class="fa-solid fa-chart-area text-blue-400"></i> 光強度分佈曲線 $I(\theta)$ (Intensity Profile Graph)
+                    </span>
+                    <div id="missingOrderTag" class="hidden text-[11px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i>缺級現象分析中
+                    </div>
+                </div>
+
+                <div class="relative w-full h-48 md:h-56 bg-black rounded-xl overflow-hidden border border-slate-800">
+                    <canvas id="graphCanvas" class="w-full h-full block"></canvas>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-physicsBorder py-3 text-center text-xs text-slate-500 bg-physicsCard/40">
+        波動光學教學展示模組 &copy; Interactive Physics Visualizer
+    </footer>
+
+    <script>
+        // State variables
+        let currentMode = 'single'; // 'single' or 'double'
+        let isPlaying = true;
+        let animationFrameId = null;
+        let timePhase = 0;
+
+        // Interactive parameters
+        let params = {
+            lambda: 550, // nm
+            a: 20,       // micrometers
+            d: 100,      // micrometers
+            L: 1.0       // meters
+        };
+
+        // DOM Elements
+        const lambdaInput = document.getElementById('lambdaInput');
+        const aInput = document.getElementById('aInput');
+        const dInput = document.getElementById('dInput');
+        const LInput = document.getElementById('LInput');
+
+        const lambdaVal = document.getElementById('lambdaValue');
+        const aVal = document.getElementById('aValue');
+        const dVal = document.getElementById('dValue');
+        const LVal = document.getElementById('LValue');
+
+        const colorIndicator = document.getElementById('colorIndicator');
+        const dControlContainer = document.getElementById('dControlContainer');
+        const physicsTextContent = document.getElementById('physicsTextContent');
+        const missingOrderTag = document.getElementById('missingOrderTag');
+
+        const simCanvas = document.getElementById('simCanvas');
+        const simCtx = simCanvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphCtx = graphCanvas.getContext('2d');
+
+        // Convert wavelength (380 - 750 nm) to CSS RGB Color
+        function wavelengthToColor(wavelength) {
+            let r = 0, g = 0, b = 0;
+            let wl = wavelength;
+
+            if (wl >= 380 && wl < 440) {
+                r = -1 * (wl - 440) / (440 - 380);
+                g = 0;
+                b = 1;
+            } else if (wl >= 440 && wl < 490) {
+                r = 0;
+                g = (wl - 440) / (490 - 440);
+                b = 1;
+            } else if (wl >= 490 && wl < 510) {
+                r = 0;
+                g = 1;
+                b = -1 * (wl - 510) / (510 - 490);
+            } else if (wl >= 510 && wl < 580) {
+                r = (wl - 510) / (580 - 510);
+                g = 1;
+                b = 0;
+            } else if (wl >= 580 && wl < 645) {
+                r = 1;
+                g = -1 * (wl - 645) / (645 - 580);
+                b = 0;
+            } else if (wl >= 645 && wl <= 750) {
+                r = 1;
+                g = 0;
+                b = 0;
+            }
+
+            // Intensity factor near edge of spectrum
+            let factor = 1.0;
+            if (wl >= 380 && wl < 420) {
+                factor = 0.3 + 0.7 * (wl - 380) / (420 - 380);
+            } else if (wl >= 700 && wl <= 750) {
+                factor = 0.3 + 0.7 * (750 - wl) / (750 - 700);
+            }
+
+            r = Math.round(r * factor * 255);
+            g = Math.round(g * factor * 255);
+            b = Math.round(b * factor * 255);
+
+            return { r, g, b, css: `rgb(${r}, ${g}, ${b})` };
+        }
+
+        // Mode Switching
+        function setMode(mode) {
+            currentMode = mode;
+            const singleBtn = document.getElementById('modeSingleBtn');
+            const doubleBtn = document.getElementById('modeDoubleBtn');
+
+            if (mode === 'single') {
+                singleBtn.className = "px-4 py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center space-x-2 bg-physicsAccent text-white shadow-lg shadow-blue-500/30";
+                doubleBtn.className = "px-4 py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-white";
+                dControlContainer.classList.add('opacity-50', 'pointer-events-none');
+            } else {
+                doubleBtn.className = "px-4 py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center space-x-2 bg-physicsAccent text-white shadow-lg shadow-blue-500/30";
+                singleBtn.className = "px-4 py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-white";
+                dControlContainer.classList.remove('opacity-50', 'pointer-events-none');
+            }
+
+            updateParams();
+        }
+
+        function togglePlayPause() {
+            isPlaying = !isPlaying;
+            const playIcon = document.getElementById('playIcon');
+            const playText = document.getElementById('playText');
+            
+            if (isPlaying) {
+                playIcon.className = "fa-solid fa-pause";
+                playText.textContent = "暫停動畫";
+            } else {
+                playIcon.className = "fa-solid fa-play";
+                playText.textContent = "播放動畫";
+            }
+        }
+
+        function updateParams() {
+            params.lambda = parseFloat(lambdaInput.value);
+            params.a = parseFloat(aInput.value);
+            params.d = parseFloat(dInput.value);
+            params.L = parseFloat(LInput.value);
+
+            // Interface Updates
+            lambdaVal.textContent = `${params.lambda} nm`;
+            aVal.innerHTML = `${params.a} &mu;m`;
+            dVal.innerHTML = `${params.d} &mu;m`;
+            LVal.textContent = `${params.L.toFixed(1)} m`;
+
+            const color = wavelengthToColor(params.lambda);
+            colorIndicator.style.backgroundColor = color.css;
+
+            // Educational Text Updates
+            if (currentMode === 'single') {
+                missingOrderTag.classList.add('hidden');
+                physicsTextContent.innerHTML = `
+                    <p><strong class="text-blue-400">單狹縫繞射 (Single Slit):</strong> 當光通過狹縫 $a$ 時，狹縫上每一點皆可視為二次波源。</p>
+                    <p><strong class="text-amber-400">中央亮紋 (Central Fringe):</strong> 寬度為一般暗紋間距的 <strong>2 倍</strong>。兩側暗紋滿足條件：$a \\sin\\theta = m\\lambda$ ($m = \\pm 1, \\pm 2 ...$)。</p>
+                    <p>當狹縫寬度 $a$ 變小時，繞射效果更顯著，中央亮帶變得更寬。</p>
+                `;
+            } else {
+                // Check missing order condition: d/a = integer
+                const ratio = params.d / params.a;
+                const isMissingOrder = Math.abs(ratio - Math.round(ratio)) < 0.08 && ratio > 1;
+
+                if (isMissingOrder) {
+                    missingOrderTag.classList.remove('hidden');
+                } else {
+                    missingOrderTag.classList.add('hidden');
+                }
+
+                physicsTextContent.innerHTML = `
+                    <p><strong class="text-blue-400">雙狹縫干涉 (Double Slit):</strong> 由兩束相干光波重疊產生。細小的密條紋代表干涉現象（間距 $\\Delta y = \\frac{\\lambda L}{d}$）。</p>
+                    <p><strong class="text-amber-400">單狹縫繞射調變:</strong> 干涉亮紋的外層輪廓受到單狹縫繞射包絡線 $({\\sin\\beta}/{\\beta})^2$ 的約束。</p>
+                    ${isMissingOrder ? `<p class="text-amber-400 font-semibold">⚠️ 發現缺級現象！當 $d/a = ${Math.round(ratio)}$ 時，干涉亮紋剛好落在繞射暗紋位置而消失！</p>` : ''}
+                `;
+            }
+        }
+
+        // Resize Canvas Elements Responsively
+        function resizeCanvases() {
+            const simRect = simCanvas.parentElement.getBoundingClientRect();
+            simCanvas.width = simRect.width;
+            simCanvas.height = simRect.height;
+
+            const graphRect = graphCanvas.parentElement.getBoundingClientRect();
+            graphCanvas.width = graphRect.width;
+            graphCanvas.height = graphRect.height;
+        }
+
+        window.addEventListener('resize', resizeCanvases);
+
+        // Intensity Calculation Functions
+        function getIntensity(y, height) {
+            // y: distance from vertical center in canvas space
+            // Normalize y to angular offset sin(theta)
+            // Scale parameter for visible aesthetics
+            const scaleFactor = 0.00035;
+            const sinTheta = (y - height / 2) * scaleFactor;
+
+            const lambdaM = params.lambda * 1e-9;
+            const aM = params.a * 1e-6;
+            const dM = params.d * 1e-6;
+
+            // Single Slit diffraction factor: beta = (pi * a * sin(theta)) / lambda
+            const beta = (Math.PI * aM * sinTheta) / lambdaM;
+            let diffFactor = 1.0;
+            if (Math.abs(beta) > 1e-6) {
+                diffFactor = Math.pow(Math.sin(beta) / beta, 2);
+            }
+
+            if (currentMode === 'single') {
+                return diffFactor;
+            } else {
+                // Double Slit interference factor: alpha = (pi * d * sin(theta)) / lambda
+                const alpha = (Math.PI * dM * sinTheta) / lambdaM;
+                const doubleFactor = Math.pow(Math.cos(alpha), 2);
+                return diffFactor * doubleFactor;
+            }
+        }
+
+        function renderSimulation() {
+            const w = simCanvas.width;
+            const h = simCanvas.height;
+            const color = wavelengthToColor(params.lambda);
+
+            simCtx.fillStyle = '#05070c';
+            simCtx.fillRect(0, 0, w, h);
+
+            // Barrier position (X = w * 0.25)
+            const barrierX = w * 0.22;
+            const screenX = w * 0.90;
+            const screenWidth = 20;
+
+            // Draw Incoming Plane Waves (Laser Light Source)
+            const wavePeriod = 15 - (params.lambda - 380) / (750 - 380) * 8; // Speed based on wavelength
+            const waveSpacing = 12;
+
+            simCtx.lineWidth = 2;
+            simCtx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.5)`;
+
+            for (let x = (timePhase % waveSpacing); x < barrierX; x += waveSpacing) {
+                simCtx.beginPath();
+                simCtx.moveTo(x, 10);
+                simCtx.lineTo(x, h - 10);
+                simCtx.stroke();
+            }
+
+            // Draw Barrier Walls
+            simCtx.fillStyle = '#334155';
+            simCtx.strokeStyle = '#475569';
+            simCtx.lineWidth = 1;
+
+            const slitWidthPx = Math.max(3, params.a * 0.6);
+            const slitDistPx = params.d * 0.4;
+
+            if (currentMode === 'single') {
+                // Top block
+                const topEnd = h / 2 - slitWidthPx / 2;
+                simCtx.fillRect(barrierX - 4, 0, 8, topEnd);
+                // Bottom block
+                const bottomStart = h / 2 + slitWidthPx / 2;
+                simCtx.fillRect(barrierX - 4, bottomStart, 8, h - bottomStart);
+            } else {
+                // Double Slit: 3 blocks
+                const slit1Center = h / 2 - slitDistPx / 2;
+                const slit2Center = h / 2 + slitDistPx / 2;
+
+                // Block 1 (Top)
+                simCtx.fillRect(barrierX - 4, 0, 8, slit1Center - slitWidthPx / 2);
+                // Block 2 (Middle)
+                simCtx.fillRect(barrierX - 4, slit1Center + slitWidthPx / 2, 8, (slit2Center - slitWidthPx / 2) - (slit1Center + slitWidthPx / 2));
+                // Block 3 (Bottom)
+                simCtx.fillRect(barrierX - 4, slit2Center + slitWidthPx / 2, 8, h - (slit2Center + slitWidthPx / 2));
+            }
+
+            // Draw Animated Wavefronts propagating towards screen
+            const numSources = currentMode === 'single' ? 7 : 2;
+            let sources = [];
+
+            if (currentMode === 'single') {
+                const top = h / 2 - slitWidthPx / 2;
+                for (let i = 0; i < numSources; i++) {
+                    sources.push(top + (slitWidthPx / (numSources - 1)) * i);
+                }
+            } else {
+                sources.push(h / 2 - slitDistPx / 2);
+                sources.push(h / 2 + slitDistPx / 2);
+            }
+
+            // Render Huygens Wavelets Rays / Ripples
+            simCtx.save();
+            simCtx.rect(barrierX + 4, 0, screenX - barrierX - 4, h);
+            simCtx.clip();
+
+            const maxRadius = screenX - barrierX;
+            for (let r = (timePhase % waveSpacing); r < maxRadius; r += waveSpacing) {
+                sources.forEach(sy => {
+                    simCtx.beginPath();
+                    simCtx.arc(barrierX, sy, r, -Math.PI / 2, Math.PI / 2);
+                    simCtx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.max(0.05, 0.4 - r / maxRadius * 0.35)})`;
+                    simCtx.lineWidth = 1.5;
+                    simCtx.stroke();
+                });
+            }
+            simCtx.restore();
+
+            // Draw Screen Pattern (Vertical Intensity Gradient on Right)
+            for (let y = 0; y < h; y += 2) {
+                const intensity = getIntensity(y, h);
+                simCtx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity})`;
+                simCtx.fillRect(screenX, y, screenWidth, 2);
+            }
+
+            // Screen Border
+            simCtx.strokeStyle = '#64748b';
+            simCtx.lineWidth = 1;
+            simCtx.strokeRect(screenX, 0, screenWidth, h);
+
+            // Annotations / Labels on Canvas
+            simCtx.fillStyle = '#94a3b8';
+            simCtx.font = '10px sans-serif';
+            simCtx.fillText('光源', 10, 20);
+            simCtx.fillText('狹縫板', barrierX - 15, 20);
+            simCtx.fillText('觀察屏幕', screenX - 10, 20);
+        }
+
+        function renderGraph() {
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            const color = wavelengthToColor(params.lambda);
+
+            graphCtx.fillStyle = '#05070c';
+            graphCtx.fillRect(0, 0, w, h);
+
+            // Draw Axes & Grid
+            graphCtx.strokeStyle = '#1e293b';
+            graphCtx.lineWidth = 1;
+
+            const centerY = h - 25; // Baseline
+            const maxGraphHeight = h - 45;
+
+            // Horizontal Grid Lines
+            for (let ratio = 0.25; ratio <= 1.0; ratio += 0.25) {
+                const gy = centerY - maxGraphHeight * ratio;
+                graphCtx.beginPath();
+                graphCtx.moveTo(40, gy);
+                graphCtx.lineTo(w - 20, gy);
+                graphCtx.stroke();
+            }
+
+            // X-Axis (Base)
+            graphCtx.strokeStyle = '#475569';
+            graphCtx.beginPath();
+            graphCtx.moveTo(40, centerY);
+            graphCtx.lineTo(w - 20, centerY);
+            graphCtx.stroke();
+
+            // Center Axis (Theta = 0)
+            const centerX = (w - 60) / 2 + 40;
+            graphCtx.setLineDash([3, 3]);
+            graphCtx.strokeStyle = '#475569';
+            graphCtx.beginPath();
+            graphCtx.moveTo(centerX, 15);
+            graphCtx.lineTo(centerX, centerY);
+            graphCtx.stroke();
+            graphCtx.setLineDash([]);
+
+            // Plot Intensity Curve
+            graphCtx.beginPath();
+            const canvasSimHeight = simCanvas.height || 300;
+
+            for (let x = 40; x <= w - 20; x++) {
+                // Map Graph X coordinate to Sim Y coordinate
+                const simY = ((x - 40) / (w - 60)) * canvasSimHeight;
+                const intensity = getIntensity(simY, canvasSimHeight);
+
+                const graphY = centerY - intensity * maxGraphHeight;
+
+                if (x === 40) {
+                    graphCtx.moveTo(x, graphY);
+                } else {
+                    graphCtx.lineTo(x, graphY);
+                }
+            }
+
+            // Fill Graph under curve
+            graphCtx.lineTo(w - 20, centerY);
+            graphCtx.lineTo(40, centerY);
+            graphCtx.closePath();
+
+            const gradient = graphCtx.createLinearGradient(0, 0, 0, h);
+            gradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.6)`);
+            gradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0.0)`);
+            graphCtx.fillStyle = gradient;
+            graphCtx.fill();
+
+            // Stroke Curve Line
+            graphCtx.lineWidth = 2;
+            graphCtx.strokeStyle = color.css;
+            graphCtx.stroke();
+
+            // Axis Labels & Text
+            graphCtx.fillStyle = '#94a3b8';
+            graphCtx.font = '11px sans-serif';
+            graphCtx.fillText('強度 I', 8, 25);
+            graphCtx.fillText('位置 / 偏角 θ', w / 2 - 25, h - 8);
+            graphCtx.fillText('0', centerX - 3, centerY + 15);
+            graphCtx.fillText('I₀', 22, centerY - maxGraphHeight + 4);
+        }
+
+        // Main Animation Loop
+        function loop() {
+            if (isPlaying) {
+                timePhase += 0.8;
+            }
+            renderSimulation();
+            renderGraph();
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+        // Initialize Application
+        window.onload = function() {
+            resizeCanvases();
+            updateParams();
+            loop();
+        };
+    </script>
+</body>
+</html>
